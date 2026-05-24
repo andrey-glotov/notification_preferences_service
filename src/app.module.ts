@@ -8,6 +8,7 @@ import { databaseConfig } from './config/database.config';
 import { DatabaseModule } from './database/database.module';
 import { ErrorsModule } from './errors/errors.module';
 import { ObservabilityModule } from './observability/observability.module';
+import { PreferencesModule } from './preferences/preferences.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { UsersModule } from './users/users.module';
     ErrorsModule,
     DatabaseModule,
     UsersModule,
+    PreferencesModule,
     AuthModule,
   ],
   controllers: [AppController],
