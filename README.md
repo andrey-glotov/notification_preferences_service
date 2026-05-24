@@ -1,58 +1,8 @@
 # Notification Preferences Service
 
-Централизованный сервис пользовательских настроек уведомлений и проверки возможности отправки уведомления.
-
-Сервис отвечает на вопрос:
-
-```text
-Можно ли отправить пользователю такое уведомление по этому каналу в это время?
-```
-
-Поддерживается:
-
-- локальная проекция пользователей;
-- дефолтные настройки уведомлений;
-- пользовательские переопределения настроек;
-- quiet hours в IANA timezone пользователя;
-- глобальные deny-политики;
-- read-only evaluation;
-- request/correlation id и структурированные observability-события;
-- Basic Auth для включённых HTTP endpoint'ов.
-
-## Стек
-
-- TypeScript
-- Node.js 24.x
-- NestJS
-- PostgreSQL
-- Drizzle ORM
-- Basic Auth
-- OpenAPI-контракт: [docs/openapi.yaml](docs/openapi.yaml)
-- observability-модуль со stdout / application logger sink
-
-## Объём MVP
-
-Реализовано:
-
-- `POST /internal/:ecosystemCode/users`
-- `GET /api/:ecosystemCode/users/:userId/preferences`
-- `POST /api/:ecosystemCode/users/:userId/preferences`
-- `POST /api/:ecosystemCode/evaluate`
-- PostgreSQL schema и seed-скрипты
-- стандартные success/error envelopes с `requestId`
-- Basic Auth guard
-- observability context, events, counters и timers
-
-Не входит в MVP:
-
-- OAuth, JWT, mTLS, scopes и роли
-- rate limiting и защита от brute force
-- синхронизация пользователей через брокер
-- API управления глобальными политиками
-- production observability sink
-- admin UI
-- несколько профилей дефолтных настроек
-
+- [Документация к бизнес требованиям](./docs/business-logic.md)
+- [Документация к observability](./docs/observability.md)
+- [Дополнительные заметки по security](./docs/security.md)
 ## Быстрый запуск через Docker
 
 Подготовить `.env`:
@@ -371,51 +321,6 @@ curl -i -X POST "${BASE_URL}/api/vk/evaluate" \
   "requestId": "req_1779604200123456789_a3f91c"
 }
 ```
-
-## Бизнес-правила
-
-Порядок принятия решения в evaluation:
-
-1. Подходящая глобальная deny-политика.
-2. Quiet hours, только для notification types с `respects_quiet_hours = true`.
-3. Пользовательская настройка.
-4. Дефолтная настройка.
-5. Fallback deny.
-
-Отсутствующие users, notification types и channels возвращают API-ошибку `404 not_found`, а не успешное deny-решение.
-
-## Observability
-
-`ObservabilityMiddleware` создаёт request context до guards/controllers:
-
-- `requestId`
-- `serviceId`
-- опциональный `correlationId`
-
-Заголовки:
-
-- `X-Request-Id`: переиспользуется, если валиден, иначе генерируется новый.
-- `X-Correlation-Id`: сохраняется в context, но не возвращается в API envelopes.
-
-Сервис записывает структурированные events, counters и timers через `ObservabilityService`.
-
-Текущий MVP sink:
-
-```text
-stdout / Nest application logger
-```
-
-Записываются:
-
-- завершение/ошибка HTTP request и duration;
-- service errors;
-- Basic Auth failures и misconfiguration;
-- изменения preferences;
-- изменения quiet hours;
-- notification decisions;
-- counters и duration timers.
-
-Observability неблокирующая: ошибки sink перехватываются и не должны ломать API responses или откатывать database operations.
 
 ## OpenAPI / Swagger UI / WebStorm
 
