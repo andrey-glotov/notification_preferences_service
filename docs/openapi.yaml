@@ -1,0 +1,856 @@
+openapi: 3.0.3
+info:
+  title: Notification Preferences Service API
+  version: 0.2.0
+  description: >
+    API для управления пользовательскими предпочтениями уведомлений и проверки
+    возможности отправки уведомления. Все enabled endpoint-ы защищены Basic Auth.
+    requestId создается через ObservabilityMiddleware и возвращается в response
+    body и header X-Request-Id.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+security:
+  - basicAuth: []
+
+tags:
+  - name: Preferences
+    description: Получение и изменение пользовательских настроек уведомлений.
+  - name: Evaluation
+    description: Проверка возможности отправки уведомления.
+  - name: Internal
+    description: Служебные endpoint-ы для тестов и локальной разработки.
+
+paths:
+  /api/{ecosystemCode}/users/{userId}/preferences:
+    get:
+      tags:
+        - Preferences
+      summary: Получить preferences пользователя
+      description: >
+        Возвращает effective preferences пользователя, quiet hours и source для
+        каждого значения. Effective preferences строятся из singleton-набора
+        default_preferences и переопределяются user_preferences.
+      operationId: getUserPreferences
+      parameters:
+        - $ref: '#/components/parameters/EcosystemCode'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Preferences пользователя возвращены.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferencesEnvelope'
+              examples:
+                defaultPreferences:
+                  value:
+                    data:
+                      ecosystemCode: vk
+                      userId: user-1
+                      preferences:
+                        - notificationType: marketing
+                          channel: email
+                          allowed: false
+                          source: default_preference
+                        - notificationType: transactional
+                          channel: email
+                          allowed: true
+                          source: default_preference
+                      quietHours: null
+                    requestId: req_1779604200123456789_a3f91c
+                withUserPreferenceAndQuietHours:
+                  value:
+                    data:
+                      ecosystemCode: vk
+                      userId: user-1
+                      preferences:
+                        - notificationType: marketing
+                          channel: email
+                          allowed: true
+                          source: user_preference
+                      quietHours:
+                        startTime: '22:00'
+                        endTime: '08:00'
+                        timezone: Asia/Yekaterinburg
+                    requestId: req_1779604200123456789_a3f91c
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+    post:
+      tags:
+        - Preferences
+      summary: Изменить preferences пользователя
+      description: >
+        Идемпотентно обновляет user_preferences и/или quiet_hours. Если в одном
+        request переданы preferences и quietHours, обновление должно быть
+        атомарным в одной transaction.
+      operationId: updateUserPreferences
+      parameters:
+        - $ref: '#/components/parameters/EcosystemCode'
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserPreferencesRequest'
+            examples:
+              preferenceOnly:
+                value:
+                  preferences:
+                    - notificationType: marketing
+                      channel: email
+                      allowed: true
+              quietHoursOnly:
+                value:
+                  quietHours:
+                    startTime: '22:00'
+                    endTime: '08:00'
+                    timezone: Asia/Yekaterinburg
+              preferenceAndQuietHours:
+                value:
+                  preferences:
+                    - notificationType: marketing
+                      channel: email
+                      allowed: false
+                  quietHours:
+                    startTime: '22:00'
+                    endTime: '08:00'
+                    timezone: Asia/Yekaterinburg
+      responses:
+        '200':
+          description: Preferences пользователя обновлены.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUserPreferencesEnvelope'
+              examples:
+                default:
+                  value:
+                    data:
+                      ecosystemCode: vk
+                      userId: user-1
+                      updated: true
+                    requestId: req_1779604200123456789_a3f91c
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/{ecosystemCode}/evaluate:
+    post:
+      tags:
+        - Evaluation
+      summary: Проверить возможность отправки уведомления
+      description: >
+        Возвращает allow/deny и стабильные reason/source. Evaluation является
+        read-only и не изменяет users, preferences, quiet hours, default
+        preferences или global policies.
+      operationId: evaluateNotification
+      parameters:
+        - $ref: '#/components/parameters/EcosystemCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateNotificationRequest'
+            examples:
+              default:
+                value:
+                  userId: user-1
+                  notificationType: marketing
+                  channel: email
+                  region: EU
+                  datetime: '2027-05-21T21:30:00Z'
+      responses:
+        '200':
+          description: Решение принято.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluateNotificationEnvelope'
+              examples:
+                deniedByGlobalPolicy:
+                  value:
+                    data:
+                      decision: deny
+                      reason: blocked_by_global_policy
+                      source: global_policy
+                    requestId: req_1779604200123456789_a3f91c
+                deniedByQuietHours:
+                  value:
+                    data:
+                      decision: deny
+                      reason: blocked_by_quiet_hours
+                      source: quiet_hours
+                    requestId: req_1779604200123456789_a3f91c
+                allowedByUserPreference:
+                  value:
+                    data:
+                      decision: allow
+                      reason: allowed_by_user_preference
+                      source: user_preference
+                    requestId: req_1779604200123456789_a3f91c
+                fallbackDeny:
+                  value:
+                    data:
+                      decision: deny
+                      reason: fallback_deny
+                      source: fallback
+                    requestId: req_1779604200123456789_a3f91c
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /internal/{ecosystemCode}/users:
+    post:
+      tags:
+        - Internal
+      summary: Создать или обновить локальную пользовательскую проекцию
+      description: >
+        Служебный endpoint для local/test сценариев без брокера сообщений.
+        Endpoint доступен только при ENABLE_INTERNAL_ENDPOINTS=true. Если flag
+        выключен, endpoint должен вернуть 404 и не раскрывать, что internal API
+        существует. Если flag включен, endpoint все равно требует Basic Auth.
+      operationId: createInternalUser
+      parameters:
+        - $ref: '#/components/parameters/EcosystemCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInternalUserRequest'
+            examples:
+              withRegion:
+                value:
+                  userId: user-1
+                  region: EU
+              withoutRegion:
+                value:
+                  userId: user-1
+              clearRegion:
+                value:
+                  userId: user-1
+                  region: null
+      responses:
+        '200':
+          description: Пользователь создан или обновлен идемпотентно.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalUserEnvelope'
+              examples:
+                default:
+                  value:
+                    data:
+                      id: 018f7e52-7d2a-7f20-a1e0-1b9ffb3a8a11
+                      ecosystemCode: vk
+                      userId: user-1
+                      region: EU
+                    requestId: req_1779604200123456789_a3f91c
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+      description: >
+        Basic Auth для всех enabled HTTP endpoint-ов. Вне local development
+        должен использоваться только поверх HTTPS/TLS.
+
+  headers:
+    XRequestId:
+      description: requestId, созданный или принятый ObservabilityMiddleware.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        example: req_1779604200123456789_a3f91c
+    WWWAuthenticate:
+      description: Basic authentication challenge.
+      schema:
+        type: string
+        example: Basic realm="Notification Preferences Service"
+
+  parameters:
+    EcosystemCode:
+      name: ecosystemCode
+      in: path
+      required: true
+      description: Код экосистемы или tenant-источника пользователя.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+      example: vk
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: Id пользователя во внешней системе внутри выбранной экосистемы.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      example: user-1
+
+  responses:
+    ValidationError:
+      description: Ошибка валидации входных данных.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: validation_error
+                  message: Request validation failed.
+                  details:
+                    fields:
+                      - path: preferences.0.channel
+                        messages:
+                          - channel must be a string
+                requestId: req_1779604200123456789_a3f91c
+
+    BadRequest:
+      description: Некорректный запрос после базовой DTO-валидации.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidTimezone:
+              value:
+                error:
+                  code: bad_request
+                  message: Invalid timezone.
+                  details: null
+                requestId: req_1779604200123456789_a3f91c
+
+    Unauthorized:
+      description: Basic Auth credentials отсутствуют или некорректны.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WWWAuthenticate'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: unauthorized
+                  message: Authentication is required.
+                  details: null
+                requestId: req_1779604200123456789_a3f91c
+
+    NotFound:
+      description: Ресурс не найден.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            userNotFound:
+              value:
+                error:
+                  code: not_found
+                  message: User was not found.
+                  details:
+                    ecosystemCode: vk
+                    userId: user-1
+                requestId: req_1779604200123456789_a3f91c
+            genericNotFound:
+              value:
+                error:
+                  code: not_found
+                  message: Resource was not found.
+                  details: null
+                requestId: req_1779604200123456789_a3f91c
+
+    Conflict:
+      description: Конфликт состояния, который не удалось корректно разрешить идемпотентным upsert.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: conflict
+                  message: Conflict.
+                  details: null
+                requestId: req_1779604200123456789_a3f91c
+
+    InternalServerError:
+      description: Внутренняя ошибка сервиса.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: internal_server_error
+                  message: Internal server error.
+                  details: null
+                requestId: req_1779604200123456789_a3f91c
+
+    ServiceUnavailable:
+      description: Обязательная инфраструктурная зависимость недоступна.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            default:
+              value:
+                error:
+                  code: service_unavailable
+                  message: Service unavailable.
+                  details: null
+                requestId: req_1779604200123456789_a3f91c
+
+  schemas:
+    ErrorCode:
+      type: string
+      enum:
+        - validation_error
+        - bad_request
+        - unauthorized
+        - not_found
+        - conflict
+        - internal_server_error
+        - service_unavailable
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - requestId
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetails'
+        requestId:
+          type: string
+          nullable: true
+          description: Id запроса из observability context.
+          example: req_1779604200123456789_a3f91c
+
+    ErrorDetails:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - details
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: Безопасное человекочитаемое описание ошибки.
+          example: Request validation failed.
+        details:
+          nullable: true
+          description: >
+            Только безопасные детали ошибки. Не содержит headers, credentials,
+            raw SQL errors, stack traces или raw request body.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+
+    PreferenceSource:
+      type: string
+      enum:
+        - user_preference
+        - default_preference
+
+    Decision:
+      type: string
+      enum:
+        - allow
+        - deny
+
+    DecisionSource:
+      type: string
+      enum:
+        - global_policy
+        - quiet_hours
+        - user_preference
+        - default_preference
+        - fallback
+
+    DecisionReason:
+      type: string
+      enum:
+        - blocked_by_global_policy
+        - blocked_by_quiet_hours
+        - allowed_by_user_preference
+        - blocked_by_user_preference
+        - allowed_by_default_preference
+        - blocked_by_default_preference
+        - fallback_deny
+
+    PreferenceItem:
+      type: object
+      additionalProperties: false
+      required:
+        - notificationType
+        - channel
+        - allowed
+      properties:
+        notificationType:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Код типа уведомления.
+          example: marketing
+        channel:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Код канала доставки.
+          example: email
+        allowed:
+          type: boolean
+          description: Разрешена ли отправка для пары notificationType + channel.
+          example: false
+
+    EffectivePreferenceItem:
+      type: object
+      additionalProperties: false
+      required:
+        - notificationType
+        - channel
+        - allowed
+        - source
+      properties:
+        notificationType:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: marketing
+        channel:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: email
+        allowed:
+          type: boolean
+          example: false
+        source:
+          $ref: '#/components/schemas/PreferenceSource'
+
+    QuietHours:
+      type: object
+      additionalProperties: false
+      required:
+        - startTime
+        - endTime
+        - timezone
+      properties:
+        startTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Локальное время начала quiet hours в формате HH:mm.
+          example: '22:00'
+        endTime:
+          type: string
+          pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          description: Локальное время окончания quiet hours в формате HH:mm.
+          example: '08:00'
+        timezone:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Валидная IANA timezone.
+          example: Asia/Yekaterinburg
+
+    UserPreferencesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - ecosystemCode
+        - userId
+        - preferences
+        - quietHours
+      properties:
+        ecosystemCode:
+          type: string
+          example: vk
+        userId:
+          type: string
+          example: user-1
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/EffectivePreferenceItem'
+        quietHours:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/QuietHours'
+
+    UserPreferencesEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/UserPreferencesResponse'
+        requestId:
+          type: string
+          nullable: true
+          example: req_1779604200123456789_a3f91c
+
+    UpdateUserPreferencesRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        preferences:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/PreferenceItem'
+        quietHours:
+          $ref: '#/components/schemas/QuietHours'
+      description: >
+        Request body должен содержать хотя бы одно поле: preferences или quietHours.
+        startTime = endTime должно быть отклонено на уровне validation/domain validation.
+
+    UpdateUserPreferencesResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - ecosystemCode
+        - userId
+        - updated
+      properties:
+        ecosystemCode:
+          type: string
+          example: vk
+        userId:
+          type: string
+          example: user-1
+        updated:
+          type: boolean
+          example: true
+
+    UpdateUserPreferencesEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/UpdateUserPreferencesResponse'
+        requestId:
+          type: string
+          nullable: true
+          example: req_1779604200123456789_a3f91c
+
+    EvaluateNotificationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+        - notificationType
+        - channel
+        - region
+        - datetime
+      properties:
+        userId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          example: user-1
+        notificationType:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: marketing
+        channel:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: email
+        region:
+          type: string
+          minLength: 1
+          maxLength: 32
+          example: EU
+        datetime:
+          type: string
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$'
+          description: >
+            Конкретный момент времени с timezone offset. Naive/local datetime
+            без offset запрещен. Значение в прошлом должно возвращать 400.
+          example: '2027-05-21T21:30:00Z'
+
+    EvaluateNotificationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - decision
+        - reason
+        - source
+      properties:
+        decision:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          $ref: '#/components/schemas/DecisionReason'
+        source:
+          $ref: '#/components/schemas/DecisionSource'
+
+    EvaluateNotificationEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/EvaluateNotificationResponse'
+        requestId:
+          type: string
+          nullable: true
+          example: req_1779604200123456789_a3f91c
+
+    CreateInternalUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - userId
+      properties:
+        userId:
+          type: string
+          minLength: 1
+          maxLength: 128
+          example: user-1
+        region:
+          type: string
+          nullable: true
+          maxLength: 32
+          example: EU
+
+    InternalUserResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - ecosystemCode
+        - userId
+        - region
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 018f7e52-7d2a-7f20-a1e0-1b9ffb3a8a11
+        ecosystemCode:
+          type: string
+          example: vk
+        userId:
+          type: string
+          example: user-1
+        region:
+          type: string
+          nullable: true
+          example: EU
+
+    InternalUserEnvelope:
+      type: object
+      additionalProperties: false
+      required:
+        - data
+        - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/InternalUserResponse'
+        requestId:
+          type: string
+          nullable: true
+          example: req_1779604200123456789_a3f91c
