@@ -13,9 +13,11 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
-    "drizzle:generate": "drizzle-kit generate",
-    "drizzle:migrate": "drizzle-kit migrate",
-    "drizzle:studio": "drizzle-kit studio"
+    "drizzle:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "drizzle:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "drizzle:studio": "drizzle-kit studio --config=drizzle.config.ts",
+    "db:seed": "ts-node -r dotenv/config src/database/seeds/base.seed.ts",
+    "db:seed:test": "ts-node -r dotenv/config src/database/seeds/test.seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.1.23",
@@ -29,6 +31,8 @@
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.21",
+    "dotenv": "17.4.2",
+    "ts-node": "10.9.2",
     "@nestjs/schematics": "11.1.0",
     "@nestjs/testing": "11.1.23",
     "@types/node": "25.9.1",

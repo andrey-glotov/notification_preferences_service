@@ -18,3 +18,10 @@ The application starts on `APP_PORT` and uses PostgreSQL from `docker-compose.ym
 pnpm run drizzle:generate
 pnpm run drizzle:migrate
 ```
+
+## Seeds
+
+```bash
+pnpm run db:seed
+pnpm run db:seed:test
+```
