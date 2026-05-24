@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "nest build",
+    "test": "node --test -r ts-node/register test/*.spec.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
@@ -31,13 +32,14 @@
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.21",
-    "dotenv": "17.4.2",
-    "ts-node": "10.9.2",
     "@nestjs/schematics": "11.1.0",
     "@nestjs/testing": "11.1.23",
+    "@types/express": "^5.0.6",
     "@types/node": "25.9.1",
     "@types/pg": "8.20.0",
+    "dotenv": "17.4.2",
     "drizzle-kit": "0.31.10",
+    "ts-node": "10.9.2",
     "typescript": "6.0.3"
   }
 }

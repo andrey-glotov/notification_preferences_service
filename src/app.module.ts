@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
 import { DatabaseModule } from './database/database.module';
+import { ObservabilityModule } from './observability/observability.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { DatabaseModule } from './database/database.module';
       envFilePath: '.env',
       load: [appConfig, databaseConfig],
     }),
+    ObservabilityModule,
     DatabaseModule,
   ],
   controllers: [AppController],
