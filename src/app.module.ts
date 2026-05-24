@@ -8,6 +8,7 @@ import { databaseConfig } from './config/database.config';
 import { DatabaseModule } from './database/database.module';
 import { ErrorsModule } from './errors/errors.module';
 import { ObservabilityModule } from './observability/observability.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -18,8 +19,9 @@ import { ObservabilityModule } from './observability/observability.module';
     }),
     ObservabilityModule,
     ErrorsModule,
-    AuthModule,
     DatabaseModule,
+    UsersModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
