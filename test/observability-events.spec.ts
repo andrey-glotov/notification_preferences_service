@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'node:test';
+import { ok, equal, rejects, throws, doesNotThrow } from 'node:assert/strict';
 import { ConfigService } from '@nestjs/config';
 import { ExecutionContext } from '@nestjs/common';
 import { ErrorService } from '../src/errors/error.service';
@@ -110,11 +110,11 @@ test('observability records include context fields and outside-context serviceId
     operation: 'record_test',
   });
 
-  assert.equal(sink.records[0].requestId, 'request-123');
-  assert.equal(sink.records[0].serviceId, 'test-service');
-  assert.equal(sink.records[0].correlationId, 'correlation-123');
-  assert.equal(sink.records[1].requestId, null);
-  assert.equal(sink.records[1].serviceId, 'test-service');
+  equal(sink.records[0].requestId, 'request-123');
+  equal(sink.records[0].serviceId, 'test-service');
+  equal(sink.records[0].correlationId, 'correlation-123');
+  equal(sink.records[1].requestId, null);
+  equal(sink.records[1].serviceId, 'test-service');
 });
 
 test('stdout sink writes structured JSON records', () => {
@@ -136,14 +136,14 @@ test('stdout sink writes structured JSON records', () => {
     payload: { ok: true },
   });
 
-  assert.equal(JSON.parse(messages[0]).eventType, 'test_event');
+  equal(JSON.parse(messages[0]).eventType, 'test_event');
 });
 
 test('sink failure does not throw into business flow', () => {
   const { observabilityService, sink } = createObservability();
   sink.fail = true;
 
-  assert.doesNotThrow(() =>
+  doesNotThrow(() =>
     observabilityService.recordEvent({
       eventType: 'test_event',
       component: 'tests',
@@ -179,9 +179,9 @@ test('service sanitizes payloads and metric labels', () => {
   });
 
   const serialized = JSON.stringify(sink.records);
-  assert.equal(serialized.includes('Basic secret'), false);
-  assert.equal(serialized.includes('user:password'), false);
-  assert.equal(serialized.includes('password authentication'), false);
+  equal(serialized.includes('Basic secret'), false);
+  equal(serialized.includes('user:password'), false);
+  equal(serialized.includes('password authentication'), false);
 });
 
 test('preferences service records preference and quiet hours events after successful update only', async () => {
@@ -205,9 +205,9 @@ test('preferences service records preference and quiet hours events after succes
     quietHours: { startTime: '22:00', endTime: '08:00', timezone: 'Asia/Yekaterinburg' },
   });
 
-  assert.ok(sink.records.some((record) => record.eventType === 'preference_changed'));
-  assert.ok(sink.records.some((record) => record.eventType === 'quiet_hours_changed'));
-  assert.ok(sink.records.some((record) => record.payload.metricName === 'preference_changes_total'));
+  ok(sink.records.some((record) => record.eventType === 'preference_changed'));
+  ok(sink.records.some((record) => record.eventType === 'quiet_hours_changed'));
+  ok(sink.records.some((record) => record.payload.metricName === 'preference_changes_total'));
 
   sink.records = [];
   const failingService = new PreferencesService(
@@ -221,14 +221,14 @@ test('preferences service records preference and quiet hours events after succes
     observabilityService,
   );
 
-  await assert.rejects(() =>
+  await rejects(() =>
     failingService.updateUserPreferences({
       ecosystemCode: 'vk',
       userId: 'user-1',
       preferences: [{ notificationType: 'marketing', channel: 'email', allowed: true }],
     }),
   );
-  assert.equal(sink.records.some((record) => record.eventType === 'preference_changed'), false);
+  equal(sink.records.some((record) => record.eventType === 'preference_changed'), false);
 });
 
 test('evaluation records notification decision event, counters, and duration timer only after success', async () => {
@@ -256,9 +256,9 @@ test('evaluation records notification decision event, counters, and duration tim
     datetime: new Date(Date.now() + 60_000).toISOString(),
   });
 
-  assert.ok(sink.records.some((record) => record.eventType === 'notification_decision'));
-  assert.ok(sink.records.some((record) => record.payload.metricName === 'notification_decision_total'));
-  assert.ok(sink.records.some((record) => record.payload.metricName === 'notification_decision_duration_ms'));
+  ok(sink.records.some((record) => record.eventType === 'notification_decision'));
+  ok(sink.records.some((record) => record.payload.metricName === 'notification_decision_total'));
+  ok(sink.records.some((record) => record.payload.metricName === 'notification_decision_duration_ms'));
 
   sink.records = [];
   const failingService = new EvaluationService(
@@ -269,7 +269,7 @@ test('evaluation records notification decision event, counters, and duration tim
     observabilityService,
   );
 
-  await assert.rejects(() =>
+  await rejects(() =>
     failingService.evaluate({
       ecosystemCode: 'vk',
       userId: 'missing',
@@ -279,7 +279,7 @@ test('evaluation records notification decision event, counters, and duration tim
       datetime: new Date(Date.now() + 60_000).toISOString(),
     }),
   );
-  assert.equal(sink.records.some((record) => record.eventType === 'notification_decision'), false);
+  equal(sink.records.some((record) => record.eventType === 'notification_decision'), false);
 });
 
 test('global exception filter records service_error', () => {
@@ -294,9 +294,9 @@ test('global exception filter records service_error', () => {
   } as never);
 
   const event = sink.records.find((record) => record.eventType === 'service_error');
-  assert.ok(event);
-  assert.equal(event.payload.errorCode, 'internal_server_error');
-  assert.equal(JSON.stringify(event).includes('raw secret failure'), false);
+  ok(event);
+  equal(event.payload.errorCode, 'internal_server_error');
+  equal(JSON.stringify(event).includes('raw secret failure'), false);
 });
 
 test('basic auth failure records sanitized auth service error and counter', () => {
@@ -319,11 +319,11 @@ test('basic auth failure records sanitized auth service error and counter', () =
     observabilityService,
   );
 
-  assert.throws(() => guard.canActivate(createExecutionContext('Basic bG9jYWw6d3Jvbmc=')));
+  throws(() => guard.canActivate(createExecutionContext('Basic bG9jYWw6d3Jvbmc=')));
 
   const serialized = JSON.stringify(sink.records);
-  assert.ok(sink.records.some((record) => record.eventType === 'service_error'));
-  assert.ok(sink.records.some((record) => record.payload.metricName === 'auth_failures_total'));
-  assert.equal(serialized.includes('bG9jYWw6d3Jvbmc='), false);
-  assert.equal(serialized.includes('local:wrong'), false);
+  ok(sink.records.some((record) => record.eventType === 'service_error'));
+  ok(sink.records.some((record) => record.payload.metricName === 'auth_failures_total'));
+  equal(serialized.includes('bG9jYWw6d3Jvbmc='), false);
+  equal(serialized.includes('local:wrong'), false);
 });

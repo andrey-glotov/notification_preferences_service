@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'node:test';
+import { ok, equal, deepEqual } from 'node:assert/strict';
 import { ConfigService } from '@nestjs/config';
 import { ExecutionContext } from '@nestjs/common';
 import { BasicAuthGuard, WWW_AUTHENTICATE_VALUE } from '../src/auth/basic-auth.guard';
@@ -138,7 +138,7 @@ function runGuard(
           response,
         };
       } catch (error) {
-        assert.ok(error instanceof ApplicationError);
+        ok(error instanceof ApplicationError);
 
         return {
           allowed: false,
@@ -167,9 +167,9 @@ for (const [name, authorization] of unauthorizedCases) {
   test(`${name} returns 401 with standard auth error envelope`, () => {
     const { response, body, error } = runGuard(authorization);
 
-    assert.equal(response.statusCode, 401);
-    assert.equal(response.headers.get('www-authenticate'), WWW_AUTHENTICATE_VALUE);
-    assert.deepEqual(body, {
+    equal(response.statusCode, 401);
+    equal(response.headers.get('www-authenticate'), WWW_AUTHENTICATE_VALUE);
+    deepEqual(body, {
       error: {
         code: ERROR_CODES.unauthorized,
         message: 'Authentication is required.',
@@ -177,9 +177,9 @@ for (const [name, authorization] of unauthorizedCases) {
       },
       requestId: 'request-123',
     });
-    assert.equal(error?.component, 'auth');
-    assert.equal(error?.operation, 'basic_auth');
-    assert.equal(error?.severity, 'warning');
+    equal(error?.component, 'auth');
+    equal(error?.operation, 'basic_auth');
+    equal(error?.severity, 'warning');
   });
 }
 
@@ -187,22 +187,22 @@ test('correct credentials pass to the next handler', () => {
   const authorization = `Basic ${encodeCredentials('expected-user', 'expected-pass')}`;
   const { allowed, response } = runGuard(authorization);
 
-  assert.equal(allowed, true);
-  assert.equal(response.headers.has('www-authenticate'), false);
+  equal(allowed, true);
+  equal(response.headers.has('www-authenticate'), false);
 });
 
 test('password containing colon is parsed correctly', () => {
   const authorization = `Basic ${encodeCredentials('expected-user', 'sec:ret')}`;
   const { allowed } = runGuard(authorization, 'expected-user', 'sec:ret');
 
-  assert.equal(allowed, true);
+  equal(allowed, true);
 });
 
 test('auth scheme comparison is case-insensitive', () => {
   const authorization = `bAsIc ${encodeCredentials('expected-user', 'expected-pass')}`;
   const { allowed } = runGuard(authorization);
 
-  assert.equal(allowed, true);
+  equal(allowed, true);
 });
 
 test('auth errors do not expose Authorization header, token, decoded credentials, username, or password', () => {
@@ -210,11 +210,11 @@ test('auth errors do not expose Authorization header, token, decoded credentials
   const { body } = runGuard(authorization);
   const serializedBody = JSON.stringify(body);
 
-  assert.equal(serializedBody.includes(authorization), false);
-  assert.equal(serializedBody.includes(encodeCredentials('expected-user', 'wrong-pass')), false);
-  assert.equal(serializedBody.includes('expected-user:wrong-pass'), false);
-  assert.equal(serializedBody.includes('expected-user'), false);
-  assert.equal(serializedBody.includes('wrong-pass'), false);
+  equal(serializedBody.includes(authorization), false);
+  equal(serializedBody.includes(encodeCredentials('expected-user', 'wrong-pass')), false);
+  equal(serializedBody.includes('expected-user:wrong-pass'), false);
+  equal(serializedBody.includes('expected-user'), false);
+  equal(serializedBody.includes('wrong-pass'), false);
 });
 
 test('missing configured credentials return safe internal_server_error without env names or values', () => {
@@ -222,8 +222,8 @@ test('missing configured credentials return safe internal_server_error without e
   const { response, body, error } = runGuard(authorization, '', undefined);
   const serializedBody = JSON.stringify(body);
 
-  assert.equal(response.statusCode, 500);
-  assert.deepEqual(body, {
+  equal(response.statusCode, 500);
+  deepEqual(body, {
     error: {
       code: ERROR_CODES.internal,
       message: 'Internal server error.',
@@ -231,12 +231,12 @@ test('missing configured credentials return safe internal_server_error without e
     },
     requestId: 'request-123',
   });
-  assert.equal(response.headers.has('www-authenticate'), false);
-  assert.equal(serializedBody.includes('BASIC_AUTH_USERNAME'), false);
-  assert.equal(serializedBody.includes('BASIC_AUTH_PASSWORD'), false);
-  assert.equal(serializedBody.includes('expected-user'), false);
-  assert.equal(serializedBody.includes('expected-pass'), false);
-  assert.equal(error?.component, 'auth');
-  assert.equal(error?.operation, 'basic_auth');
-  assert.equal(error?.severity, 'critical');
+  equal(response.headers.has('www-authenticate'), false);
+  equal(serializedBody.includes('BASIC_AUTH_USERNAME'), false);
+  equal(serializedBody.includes('BASIC_AUTH_PASSWORD'), false);
+  equal(serializedBody.includes('expected-user'), false);
+  equal(serializedBody.includes('expected-pass'), false);
+  equal(error?.component, 'auth');
+  equal(error?.operation, 'basic_auth');
+  equal(error?.severity, 'critical');
 });

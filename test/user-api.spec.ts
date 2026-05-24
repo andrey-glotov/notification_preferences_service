@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'node:test';
+import { equal, deepEqual, rejects, match, throws } from 'node:assert/strict';
 import { ArgumentMetadata, ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
@@ -155,12 +155,12 @@ function runInternalThenBasicAuth(enableInternalEndpoints: boolean, authorizatio
 async function expectValidationError(value: unknown, metadata: ArgumentMetadata, expectedPath: string): Promise<void> {
   const pipe = createValidationPipe(new ErrorService());
 
-  await assert.rejects(
+  await rejects(
     () => pipe.transform(value, metadata),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.validation);
-      assert.equal(JSON.stringify((error as { details?: unknown }).details).includes(expectedPath), true);
-      assert.equal(JSON.stringify((error as { details?: unknown }).details).includes('rawBody'), false);
+      equal((error as { code?: string }).code, ERROR_CODES.validation);
+      equal(JSON.stringify((error as { details?: unknown }).details).includes(expectedPath), true);
+      equal(JSON.stringify((error as { details?: unknown }).details).includes('rawBody'), false);
       return true;
     },
   );
@@ -176,11 +176,11 @@ test('POST /internal/:ecosystemCode/users creates a new user when enabled', asyn
     region: 'EU',
   });
 
-  assert.match(user.id, /^[0-9a-f-]{36}$/);
-  assert.equal(user.ecosystemCode, 'vk');
-  assert.equal(user.userId, 'user-1');
-  assert.equal(user.region, 'EU');
-  assert.equal(repository.countByExternalIdentity('vk', 'user-1'), 1);
+  match(user.id, /^[0-9a-f-]{36}$/);
+  equal(user.ecosystemCode, 'vk');
+  equal(user.userId, 'user-1');
+  equal(user.region, 'EU');
+  equal(repository.countByExternalIdentity('vk', 'user-1'), 1);
 });
 
 test('successful controller response matches { data, requestId }', async () => {
@@ -199,11 +199,11 @@ test('successful controller response matches { data, requestId }', async () => {
     async () => {
       const response = await controller.createInternalUser({ ecosystemCode: 'vk' }, { userId: 'user-1', region: 'EU' });
 
-      assert.equal(response.requestId, 'request-123');
-      assert.equal(response.data.ecosystemCode, 'vk');
-      assert.equal(response.data.userId, 'user-1');
-      assert.equal(response.data.region, 'EU');
-      assert.match(response.data.id, /^[0-9a-f-]{36}$/);
+      equal(response.requestId, 'request-123');
+      equal(response.data.ecosystemCode, 'vk');
+      equal(response.data.userId, 'user-1');
+      equal(response.data.region, 'EU');
+      match(response.data.id, /^[0-9a-f-]{36}$/);
     },
   );
 });
@@ -214,8 +214,8 @@ test('repeated same request is idempotent and does not create duplicates', async
   const first = await service.createOrUpdateInternalUser({ ecosystemCode: 'vk', userId: 'user-1', region: 'EU' });
   const second = await service.createOrUpdateInternalUser({ ecosystemCode: 'vk', userId: 'user-1', region: 'EU' });
 
-  assert.deepEqual(second, first);
-  assert.equal(repository.countByExternalIdentity('vk', 'user-1'), 1);
+  deepEqual(second, first);
+  equal(repository.countByExternalIdentity('vk', 'user-1'), 1);
 });
 
 test('new region updates region, omitted region preserves it, and null clears it', async () => {
@@ -227,10 +227,10 @@ test('new region updates region, omitted region preserves it, and null clears it
   const preserved = await service.createOrUpdateInternalUser({ ecosystemCode: 'vk', userId: 'user-1' });
   const cleared = await service.createOrUpdateInternalUser({ ecosystemCode: 'vk', userId: 'user-1', region: null });
 
-  assert.equal(updated.region, 'CIS');
-  assert.equal(preserved.region, 'CIS');
-  assert.equal(cleared.region, null);
-  assert.equal(repository.countByExternalIdentity('vk', 'user-1'), 1);
+  equal(updated.region, 'CIS');
+  equal(preserved.region, 'CIS');
+  equal(cleared.region, null);
+  equal(repository.countByExternalIdentity('vk', 'user-1'), 1);
 });
 
 test('extra body fields return validation_error', async () => {
@@ -262,10 +262,10 @@ test('too long region returns validation_error', async () => {
 });
 
 test('request without Basic Auth returns 401 when endpoint is enabled', () => {
-  assert.throws(
+  throws(
     () => runInternalThenBasicAuth(true),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.unauthorized);
+      equal((error as { code?: string }).code, ERROR_CODES.unauthorized);
       return true;
     },
   );
@@ -274,21 +274,21 @@ test('request without Basic Auth returns 401 when endpoint is enabled', () => {
 test('request with correct Basic Auth reaches controller when endpoint is enabled', () => {
   const result = runInternalThenBasicAuth(true, `Basic ${encodeCredentials('local', 'local')}`);
 
-  assert.equal(result, true);
+  equal(result, true);
 });
 
 test('disabled internal endpoint returns 404 before Basic Auth challenge and does not call service', () => {
   const repository = new InMemoryUsersRepository();
 
-  assert.throws(
+  throws(
     () => runInternalThenBasicAuth(false),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.notFound);
-      assert.equal((error as { message?: string }).message, 'Resource was not found.');
+      equal((error as { code?: string }).code, ERROR_CODES.notFound);
+      equal((error as { message?: string }).message, 'Resource was not found.');
       return true;
     },
   );
-  assert.equal(repository.upsertCalls, 0);
+  equal(repository.upsertCalls, 0);
 });
 
 test('disabled internal endpoint does not include Basic Auth challenge', () => {
@@ -296,7 +296,7 @@ test('disabled internal endpoint does not include Basic Auth challenge', () => {
   const response = new TestResponse();
   const executionContext = createExecutionContext(createRequest('/internal/vk/users'), response);
 
-  assert.throws(() =>
+  throws(() =>
     contextService.runWithContext(
       {
         requestId: 'request-123',
@@ -306,7 +306,7 @@ test('disabled internal endpoint does not include Basic Auth challenge', () => {
       () => internalGuard.canActivate(executionContext),
     ),
   );
-  assert.equal(response.headers.has('www-authenticate'), false);
+  equal(response.headers.has('www-authenticate'), false);
 });
 
 test('internal availability guard is a no-op for public API endpoints', () => {
@@ -314,17 +314,17 @@ test('internal availability guard is a no-op for public API endpoints', () => {
   const response = new TestResponse();
   const executionContext = createExecutionContext(createRequest('/api/vk/evaluate'), response);
 
-  assert.equal(internalGuard.canActivate(executionContext), true);
+  equal(internalGuard.canActivate(executionContext), true);
 });
 
 test('auth error details do not include raw headers or credentials', () => {
-  assert.throws(
+  throws(
     () => runInternalThenBasicAuth(true, `Basic ${encodeCredentials('local', 'wrong')}`),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.unauthorized);
-      assert.equal((error as { details?: unknown }).details, null);
-      assert.equal(JSON.stringify(error).includes('authorization'), false);
-      assert.equal(JSON.stringify(error).includes('local:wrong'), false);
+      equal((error as { code?: string }).code, ERROR_CODES.unauthorized);
+      equal((error as { details?: unknown }).details, null);
+      equal(JSON.stringify(error).includes('authorization'), false);
+      equal(JSON.stringify(error).includes('local:wrong'), false);
       return true;
     },
   );
@@ -335,7 +335,7 @@ test('Basic Auth failure on enabled endpoint includes WWW-Authenticate challenge
   const response = new TestResponse();
   const executionContext = createExecutionContext(createRequest('/internal/vk/users'), response);
 
-  assert.throws(() =>
+  throws(() =>
     contextService.runWithContext(
       {
         requestId: 'request-123',
@@ -348,5 +348,5 @@ test('Basic Auth failure on enabled endpoint includes WWW-Authenticate challenge
       },
     ),
   );
-  assert.equal(response.headers.get('www-authenticate'), WWW_AUTHENTICATE_VALUE);
+  equal(response.headers.get('www-authenticate'), WWW_AUTHENTICATE_VALUE);
 });

@@ -1,6 +1,6 @@
-import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { ok, equal, deepEqual, match, notEqual, throws } from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import test from 'node:test';
 import { ConfigService } from '@nestjs/config';
 import { ObservabilityContextService, DEFAULT_SERVICE_ID } from '../src/observability/observability-context.service';
 import { ObservabilityMiddleware } from '../src/observability/observability.middleware';
@@ -49,8 +49,8 @@ function createMiddleware(serviceId?: string): {
 test('generated request ids use the documented format and validate successfully', () => {
   const requestId = generateRequestId();
 
-  assert.match(requestId, /^req_\d+_[a-f0-9]{6}$/);
-  assert.equal(isValidRequestId(requestId), true);
+  match(requestId, /^req_\d+_[a-f0-9]{6}$/);
+  equal(isValidRequestId(requestId), true);
 });
 
 test('request without X-Request-Id receives generated requestId in context and response header', () => {
@@ -63,10 +63,10 @@ test('request without X-Request-Id receives generated requestId in context and r
     observedRequestId = contextService.getRequestId();
   });
 
-  assert.notEqual(observedRequestId, null);
-  assert.ok(observedRequestId);
-  assert.match(observedRequestId, /^req_\d+_[a-f0-9]{6}$/);
-  assert.equal(res.headers.get('X-Request-Id'), observedRequestId);
+  notEqual(observedRequestId, null);
+  ok(observedRequestId);
+  match(observedRequestId, /^req_\d+_[a-f0-9]{6}$/);
+  equal(res.headers.get('X-Request-Id'), observedRequestId);
 });
 
 test('valid X-Request-Id is reused', () => {
@@ -75,10 +75,10 @@ test('valid X-Request-Id is reused', () => {
   const res = new TestResponse();
 
   middleware.use(req as never, res as never, () => {
-    assert.equal(contextService.getRequestId(), 'external-id:123');
+    equal(contextService.getRequestId(), 'external-id:123');
   });
 
-  assert.equal(res.headers.get('X-Request-Id'), 'external-id:123');
+  equal(res.headers.get('X-Request-Id'), 'external-id:123');
 });
 
 test('invalid X-Request-Id is replaced without blocking the request', () => {
@@ -91,12 +91,12 @@ test('invalid X-Request-Id is replaced without blocking the request', () => {
   middleware.use(req as never, res as never, () => {
     nextCalled = true;
     observedRequestId = contextService.getRequestId();
-    assert.notEqual(observedRequestId, 'bad id with spaces');
-    assert.match(observedRequestId as string, /^req_\d+_[a-f0-9]{6}$/);
+    notEqual(observedRequestId, 'bad id with spaces');
+    match(observedRequestId as string, /^req_\d+_[a-f0-9]{6}$/);
   });
 
-  assert.equal(nextCalled, true);
-  assert.equal(res.headers.get('X-Request-Id'), observedRequestId);
+  equal(nextCalled, true);
+  equal(res.headers.get('X-Request-Id'), observedRequestId);
 });
 
 test('serviceId is read from SERVICE_ID-backed app config inside context', () => {
@@ -105,8 +105,8 @@ test('serviceId is read from SERVICE_ID-backed app config inside context', () =>
   const res = new TestResponse();
 
   middleware.use(req as never, res as never, () => {
-    assert.equal(contextService.getServiceId(), 'custom-service');
-    assert.deepEqual(contextService.getContext(), {
+    equal(contextService.getServiceId(), 'custom-service');
+    deepEqual(contextService.getContext(), {
       requestId: 'request-123',
       serviceId: 'custom-service',
       correlationId: null,
@@ -117,10 +117,10 @@ test('serviceId is read from SERVICE_ID-backed app config inside context', () =>
 test('missing SERVICE_ID uses default serviceId outside request context', () => {
   const contextService = createContextService();
 
-  assert.equal(contextService.getRequestId(), null);
-  assert.equal(contextService.getCorrelationId(), null);
-  assert.equal(contextService.getContext(), null);
-  assert.equal(contextService.getServiceId(), DEFAULT_SERVICE_ID);
+  equal(contextService.getRequestId(), null);
+  equal(contextService.getCorrelationId(), null);
+  equal(contextService.getContext(), null);
+  equal(contextService.getServiceId(), DEFAULT_SERVICE_ID);
 });
 
 test('valid X-Correlation-Id is stored in context but not returned as a response header', () => {
@@ -134,10 +134,10 @@ test('valid X-Correlation-Id is stored in context but not returned as a response
   const res = new TestResponse();
 
   middleware.use(req as never, res as never, () => {
-    assert.equal(contextService.getCorrelationId(), 'correlation-123');
+    equal(contextService.getCorrelationId(), 'correlation-123');
   });
 
-  assert.equal(res.headers.has('X-Correlation-Id'), false);
+  equal(res.headers.has('X-Correlation-Id'), false);
 });
 
 test('invalid X-Correlation-Id is ignored', () => {
@@ -151,7 +151,7 @@ test('invalid X-Correlation-Id is ignored', () => {
   const res = new TestResponse();
 
   middleware.use(req as never, res as never, () => {
-    assert.equal(contextService.getCorrelationId(), null);
+    equal(contextService.getCorrelationId(), null);
   });
 });
 
@@ -160,12 +160,12 @@ test('X-Request-Id header is set before downstream handler throws', () => {
   const req: TestRequest = { headers: { 'x-request-id': 'request-123' } };
   const res = new TestResponse();
 
-  assert.throws(
+  throws(
     () =>
       middleware.use(req as never, res as never, () => {
         throw new Error('downstream failure');
       }),
     /downstream failure/,
   );
-  assert.equal(res.headers.get('X-Request-Id'), 'request-123');
+  equal(res.headers.get('X-Request-Id'), 'request-123');
 });

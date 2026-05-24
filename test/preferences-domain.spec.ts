@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'node:test';
+import { equal, deepEqual, ok, rejects } from 'node:assert/strict';
 import { ArgumentMetadata } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
@@ -68,8 +68,8 @@ class InMemoryPreferencesRepository {
     const notificationTypeId = this.notificationTypes.get(notificationType);
     const channelId = this.channels.get(channel);
 
-    assert.ok(notificationTypeId);
-    assert.ok(channelId);
+    ok(notificationTypeId);
+    ok(channelId);
     this.defaultPreferences.set(`${notificationTypeId}:${channelId}`, {
       notificationTypeId,
       channelId,
@@ -176,12 +176,12 @@ function createController(service: PreferencesService): PreferencesController {
 async function expectValidationError(value: unknown, metadata: ArgumentMetadata, expectedPath: string): Promise<void> {
   const pipe = createValidationPipe(new ErrorService());
 
-  await assert.rejects(
+  await rejects(
     () => pipe.transform(value, metadata),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.validation);
-      assert.equal(JSON.stringify((error as { details?: unknown }).details).includes(expectedPath), true);
-      assert.equal(JSON.stringify((error as { details?: unknown }).details).includes('rawBody'), false);
+      equal((error as { code?: string }).code, ERROR_CODES.validation);
+      equal(JSON.stringify((error as { details?: unknown }).details).includes(expectedPath), true);
+      equal(JSON.stringify((error as { details?: unknown }).details).includes('rawBody'), false);
       return true;
     },
   );
@@ -190,8 +190,8 @@ async function expectValidationError(value: unknown, metadata: ArgumentMetadata,
 test('GET for an existing new user returns default preferences and quietHours null', async () => {
   const preferences = await createService().getUserPreferences({ ecosystemCode: 'vk', userId: 'user-1' });
 
-  assert.equal(preferences.quietHours, null);
-  assert.deepEqual(preferences.preferences, [
+  equal(preferences.quietHours, null);
+  deepEqual(preferences.preferences, [
     {
       notificationType: 'marketing',
       channel: 'email',
@@ -218,13 +218,13 @@ test('GET returns user preference values overriding default preferences', async 
   });
   const preferences = await service.getUserPreferences({ ecosystemCode: 'vk', userId: 'user-1' });
 
-  assert.deepEqual(preferences.preferences[0], {
+  deepEqual(preferences.preferences[0], {
     notificationType: 'marketing',
     channel: 'email',
     allowed: true,
     source: 'user_preference',
   });
-  assert.deepEqual(preferences.preferences[1], {
+  deepEqual(preferences.preferences[1], {
     notificationType: 'transactional',
     channel: 'email',
     allowed: true,
@@ -235,15 +235,15 @@ test('GET returns user preference values overriding default preferences', async 
 test('unknown user returns 404 for GET and POST', async () => {
   const service = createService();
 
-  await assert.rejects(
+  await rejects(
     () => service.getUserPreferences({ ecosystemCode: 'vk', userId: 'missing' }),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.notFound);
-      assert.equal((error as { message?: string }).message, 'User was not found.');
+      equal((error as { code?: string }).code, ERROR_CODES.notFound);
+      equal((error as { message?: string }).message, 'User was not found.');
       return true;
     },
   );
-  await assert.rejects(
+  await rejects(
     () =>
       service.updateUserPreferences({
         ecosystemCode: 'vk',
@@ -251,7 +251,7 @@ test('unknown user returns 404 for GET and POST', async () => {
         preferences: [{ notificationType: 'marketing', channel: 'email', allowed: true }],
       }),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.notFound);
+      equal((error as { code?: string }).code, ERROR_CODES.notFound);
       return true;
     },
   );
@@ -278,15 +278,15 @@ test('POST creates and updates user preferences idempotently and GET reflects th
   });
   const preferences = await service.getUserPreferences({ ecosystemCode: 'vk', userId: 'user-1' });
 
-  assert.equal(repository.countUserPreferences('local-user-id'), 1);
-  assert.equal(preferences.preferences[0].allowed, false);
-  assert.equal(preferences.preferences[0].source, 'user_preference');
+  equal(repository.countUserPreferences('local-user-id'), 1);
+  equal(preferences.preferences[0].allowed, false);
+  equal(preferences.preferences[0].source, 'user_preference');
 });
 
 test('unknown notification type and unknown channel return 404', async () => {
   const service = createService();
 
-  await assert.rejects(
+  await rejects(
     () =>
       service.updateUserPreferences({
         ecosystemCode: 'vk',
@@ -294,12 +294,12 @@ test('unknown notification type and unknown channel return 404', async () => {
         preferences: [{ notificationType: 'unknown', channel: 'email', allowed: true }],
       }),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.notFound);
-      assert.equal((error as { message?: string }).message, 'Notification type was not found.');
+      equal((error as { code?: string }).code, ERROR_CODES.notFound);
+      equal((error as { message?: string }).message, 'Notification type was not found.');
       return true;
     },
   );
-  await assert.rejects(
+  await rejects(
     () =>
       service.updateUserPreferences({
         ecosystemCode: 'vk',
@@ -307,8 +307,8 @@ test('unknown notification type and unknown channel return 404', async () => {
         preferences: [{ notificationType: 'marketing', channel: 'unknown', allowed: true }],
       }),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.notFound);
-      assert.equal((error as { message?: string }).message, 'Channel was not found.');
+      equal((error as { code?: string }).code, ERROR_CODES.notFound);
+      equal((error as { message?: string }).message, 'Channel was not found.');
       return true;
     },
   );
@@ -331,12 +331,12 @@ test('POST creates, updates, and idempotently stores quiet hours including midni
     quietHours: { startTime: '21:00', endTime: '07:00', timezone: 'Europe/Moscow' },
   });
 
-  assert.deepEqual(repository.quietHours.get('local-user-id'), {
+  deepEqual(repository.quietHours.get('local-user-id'), {
     startTime: '21:00',
     endTime: '07:00',
     timezone: 'Europe/Moscow',
   });
-  assert.equal(repository.quietHours.size, 1);
+  equal(repository.quietHours.size, 1);
 });
 
 test('quiet hours startTime equal endTime and non-IANA timezone return validation_error', async () => {
@@ -421,9 +421,9 @@ test('controller success envelopes include requestId from observability context'
         { quietHours: { startTime: '22:00', endTime: '08:00', timezone: 'Asia/Yekaterinburg' } },
       );
 
-      assert.equal(getResponse.requestId, 'request-123');
-      assert.equal(postResponse.requestId, 'request-123');
-      assert.deepEqual(postResponse.data, { ecosystemCode: 'vk', userId: 'user-1', updated: true });
+      equal(getResponse.requestId, 'request-123');
+      equal(postResponse.requestId, 'request-123');
+      deepEqual(postResponse.data, { ecosystemCode: 'vk', userId: 'user-1', updated: true });
     },
   );
 });
@@ -431,7 +431,7 @@ test('controller success envelopes include requestId from observability context'
 test('preferences controller explicitly uses BasicAuthGuard', () => {
   const guards = Reflect.getMetadata(GUARDS_METADATA, PreferencesController) as unknown[];
 
-  assert.deepEqual(guards, [BasicAuthGuard]);
+  deepEqual(guards, [BasicAuthGuard]);
 });
 
 test('atomic update rolls back preferences if quiet hours part fails', async () => {
@@ -439,7 +439,7 @@ test('atomic update rolls back preferences if quiet hours part fails', async () 
   const service = createService(repository);
   repository.failNextAtomicUpdate = true;
 
-  await assert.rejects(() =>
+  await rejects(() =>
     service.updateUserPreferences({
       ecosystemCode: 'vk',
       userId: 'user-1',
@@ -448,6 +448,6 @@ test('atomic update rolls back preferences if quiet hours part fails', async () 
     }),
   );
 
-  assert.equal(repository.countUserPreferences('local-user-id'), 0);
-  assert.equal(repository.quietHours.has('local-user-id'), false);
+  equal(repository.countUserPreferences('local-user-id'), 0);
+  equal(repository.quietHours.has('local-user-id'), false);
 });

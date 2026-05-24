@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'node:test';
+import { equal, deepEqual } from 'node:assert/strict';
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ObservabilityContextService } from '../src/observability/observability-context.service';
@@ -84,8 +84,8 @@ test('ApplicationError returns OpenAPI error envelope with requestId from observ
     () => {
       const { response, body } = catchException(error, contextService);
 
-      assert.equal(response.statusCode, 404);
-      assert.deepEqual(body, {
+      equal(response.statusCode, 404);
+      deepEqual(body, {
         error: {
           code: ERROR_CODES.notFound,
           message: 'User was not found.',
@@ -100,7 +100,7 @@ test('ApplicationError returns OpenAPI error envelope with requestId from observ
 test('global exception filter returns null requestId when observability context is absent', () => {
   const { body } = catchException(new ErrorService().badRequest());
 
-  assert.equal(body.requestId, null);
+  equal(body.requestId, null);
 });
 
 test('ErrorService maps required methods to required status codes and error codes', () => {
@@ -116,28 +116,28 @@ test('ErrorService maps required methods to required status codes and error code
   ];
 
   for (const [error, statusCode, code] of cases) {
-    assert.equal(error.httpStatus, statusCode);
-    assert.equal(error.code, code);
+    equal(error.httpStatus, statusCode);
+    equal(error.code, code);
   }
 });
 
 test('unexpected exception returns safe internal error without raw message or stack', () => {
   const { response, body } = catchException(new Error('database password leaked in raw failure'));
 
-  assert.equal(response.statusCode, 500);
-  assert.equal(body.error.code, ERROR_CODES.internal);
-  assert.equal(body.error.message, 'Internal server error.');
-  assert.equal(body.error.details, null);
-  assert.equal(JSON.stringify(body).includes('database password'), false);
-  assert.equal(JSON.stringify(body).includes('stack'), false);
+  equal(response.statusCode, 500);
+  equal(body.error.code, ERROR_CODES.internal);
+  equal(body.error.message, 'Internal server error.');
+  equal(body.error.details, null);
+  equal(JSON.stringify(body).includes('database password'), false);
+  equal(JSON.stringify(body).includes('stack'), false);
 });
 
 test('Nest validation-like BadRequestException maps to validation_error', () => {
   const { response, body } = catchException(new BadRequestException(['channel must be a string']));
 
-  assert.equal(response.statusCode, 400);
-  assert.equal(body.error.code, ERROR_CODES.validation);
-  assert.equal(body.error.message, 'Request validation failed.');
+  equal(response.statusCode, 400);
+  equal(body.error.code, ERROR_CODES.validation);
+  equal(body.error.message, 'Request validation failed.');
 });
 
 test('validation details contain stable safe field paths', () => {
@@ -161,7 +161,7 @@ test('validation details contain stable safe field paths', () => {
     },
   ]);
 
-  assert.deepEqual(fields, [
+  deepEqual(fields, [
     {
       path: 'preferences.0.channel',
       messages: ['channel must be a string', 'channel must be one of: email, sms, push, messenger'],
@@ -184,7 +184,7 @@ test('sanitized details remove credentials, headers, connection strings, raw SQL
     },
   });
 
-  assert.deepEqual(sanitized, {
+  deepEqual(sanitized, {
     ecosystemCode: 'vk',
     userId: 'user-1',
     nested: {
@@ -196,5 +196,5 @@ test('sanitized details remove credentials, headers, connection strings, raw SQL
 test('global exception filter does not generate a new requestId', () => {
   const { body } = catchException(new ErrorService().internal());
 
-  assert.equal(body.requestId, null);
+  equal(body.requestId, null);
 });

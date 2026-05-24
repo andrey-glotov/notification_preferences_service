@@ -1,5 +1,5 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { test } from 'node:test';
+import { ok, equal, deepEqual, rejects } from 'node:assert/strict';
 import { ArgumentMetadata } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
@@ -205,12 +205,12 @@ function baseInput(overrides: Partial<EvaluationInput> = {}): EvaluationInput {
 async function expectValidationError(value: unknown, metadata: ArgumentMetadata, expectedPath: string): Promise<void> {
   const pipe = createValidationPipe(new ErrorService());
 
-  await assert.rejects(
+  await rejects(
     () => pipe.transform(value, metadata),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.validation);
-      assert.equal(JSON.stringify((error as { details?: unknown }).details).includes(expectedPath), true);
-      assert.equal(JSON.stringify((error as { details?: unknown }).details).includes('rawBody'), false);
+      equal((error as { code?: string }).code, ERROR_CODES.validation);
+      equal(JSON.stringify((error as { details?: unknown }).details).includes(expectedPath), true);
+      equal(JSON.stringify((error as { details?: unknown }).details).includes('rawBody'), false);
       return true;
     },
   );
@@ -224,7 +224,7 @@ test('global deny policy blocks sending before user/default preferences', async 
 
   const result = await createService(repository).evaluate(baseInput());
 
-  assert.deepEqual(result, {
+  deepEqual(result, {
     decision: 'deny',
     reason: 'blocked_by_global_policy',
     source: 'global_policy',
@@ -240,7 +240,7 @@ test('global policy matching uses priority, deterministic ordering, wildcards, a
 
   await createService(repository).evaluate(baseInput({ notificationType: 'transactional', channel: 'sms', region: 'APAC' }));
 
-  assert.equal(repository.selectedPolicyId, 'highest');
+  equal(repository.selectedPolicyId, 'highest');
 
   repository.policies.splice(0, repository.policies.length);
   repository.addPolicy({ id: 'b', notificationTypeId: null, channelId: null, region: null, priority: 5, createdAt: '2026-01-01T00:00:00.000Z' });
@@ -248,7 +248,7 @@ test('global policy matching uses priority, deterministic ordering, wildcards, a
 
   await createService(repository).evaluate(baseInput());
 
-  assert.equal(repository.selectedPolicyId, 'a');
+  equal(repository.selectedPolicyId, 'a');
 });
 
 test('quiet hours block only notification types that respect them and support crossing midnight', async () => {
@@ -258,12 +258,12 @@ test('quiet hours block only notification types that respect them and support cr
   repository.setDefaultPreference('marketing-id', 'email-id', true);
   repository.setDefaultPreference('transactional-id', 'email-id', true);
 
-  assert.deepEqual(await service.evaluate(baseInput({ datetime: futureIsoAtUtcHour(20) })), {
+  deepEqual(await service.evaluate(baseInput({ datetime: futureIsoAtUtcHour(20) })), {
     decision: 'deny',
     reason: 'blocked_by_quiet_hours',
     source: 'quiet_hours',
   });
-  assert.deepEqual(
+  deepEqual(
     await service.evaluate(baseInput({ notificationType: 'transactional', datetime: futureIsoAtUtcHour(20) })),
     {
       decision: 'allow',
@@ -278,7 +278,7 @@ test('quiet hours support same-day intervals and timezone conversion', async () 
   repository.setQuietHours('local-user-id', { startTime: '13:00', endTime: '15:00', timezone: 'Asia/Yekaterinburg' });
   repository.setDefaultPreference('marketing-id', 'email-id', true);
 
-  assert.deepEqual(await createService(repository).evaluate(baseInput({ datetime: futureIsoAtUtcHour(9) })), {
+  deepEqual(await createService(repository).evaluate(baseInput({ datetime: futureIsoAtUtcHour(9) })), {
     decision: 'deny',
     reason: 'blocked_by_quiet_hours',
     source: 'quiet_hours',
@@ -291,7 +291,7 @@ test('user preference decisions override default preferences', async () => {
   repository.setDefaultPreference('marketing-id', 'email-id', false);
   repository.setUserPreference('local-user-id', 'marketing-id', 'email-id', true);
 
-  assert.deepEqual(await service.evaluate(baseInput()), {
+  deepEqual(await service.evaluate(baseInput()), {
     decision: 'allow',
     reason: 'allowed_by_user_preference',
     source: 'user_preference',
@@ -299,7 +299,7 @@ test('user preference decisions override default preferences', async () => {
 
   repository.setUserPreference('local-user-id', 'marketing-id', 'email-id', false);
 
-  assert.deepEqual(await service.evaluate(baseInput()), {
+  deepEqual(await service.evaluate(baseInput()), {
     decision: 'deny',
     reason: 'blocked_by_user_preference',
     source: 'user_preference',
@@ -311,21 +311,21 @@ test('default preference and fallback decisions apply when user preference is ab
   const service = createService(repository);
 
   repository.setDefaultPreference('marketing-id', 'email-id', true);
-  assert.deepEqual(await service.evaluate(baseInput()), {
+  deepEqual(await service.evaluate(baseInput()), {
     decision: 'allow',
     reason: 'allowed_by_default_preference',
     source: 'default_preference',
   });
 
   repository.setDefaultPreference('marketing-id', 'email-id', false);
-  assert.deepEqual(await service.evaluate(baseInput()), {
+  deepEqual(await service.evaluate(baseInput()), {
     decision: 'deny',
     reason: 'blocked_by_default_preference',
     source: 'default_preference',
   });
 
   repository.defaultPreferences.clear();
-  assert.deepEqual(await service.evaluate(baseInput()), {
+  deepEqual(await service.evaluate(baseInput()), {
     decision: 'deny',
     reason: 'fallback_deny',
     source: 'fallback',
@@ -340,11 +340,11 @@ test('unknown user, notification type, and channel return 404 errors, not deny d
     [baseInput({ notificationType: 'missing' }), 'Notification type was not found.'],
     [baseInput({ channel: 'missing' }), 'Channel was not found.'],
   ] as const) {
-    await assert.rejects(
+    await rejects(
       () => service.evaluate(input),
       (error: unknown) => {
-        assert.equal((error as { code?: string }).code, ERROR_CODES.notFound);
-        assert.equal((error as { message?: string }).message, message);
+        equal((error as { code?: string }).code, ERROR_CODES.notFound);
+        equal((error as { message?: string }).message, message);
         return true;
       },
     );
@@ -395,7 +395,7 @@ test('evaluation controller returns envelope with requestId and uses BasicAuthGu
     async () => {
       const response = await controller.evaluate({ ecosystemCode: 'vk' }, baseInput());
 
-      assert.deepEqual(response, {
+      deepEqual(response, {
         data: {
           decision: 'allow',
           reason: 'allowed_by_default_preference',
@@ -407,7 +407,7 @@ test('evaluation controller returns envelope with requestId and uses BasicAuthGu
   );
 
   const guards = Reflect.getMetadata(GUARDS_METADATA, EvaluationController) as unknown[];
-  assert.deepEqual(guards, [BasicAuthGuard]);
+  deepEqual(guards, [BasicAuthGuard]);
 });
 
 test('evaluation is read-only and does not mutate repository state', async () => {
@@ -417,19 +417,19 @@ test('evaluation is read-only and does not mutate repository state', async () =>
 
   await createService(repository).evaluate(baseInput());
 
-  assert.equal(repository.snapshot(), before);
-  assert.ok(repository.readCount > 0);
+  equal(repository.snapshot(), before);
+  ok(repository.readCount > 0);
 });
 
 test('same start and end quiet hours from storage return safe internal error', async () => {
   const repository = createRepository();
   repository.setQuietHours('local-user-id', { startTime: '22:00', endTime: '22:00', timezone: 'Asia/Yekaterinburg' });
 
-  await assert.rejects(
+  await rejects(
     () => createService(repository).evaluate(baseInput()),
     (error: unknown) => {
-      assert.equal((error as { code?: string }).code, ERROR_CODES.internal);
-      assert.equal((error as { details?: unknown }).details, null);
+      equal((error as { code?: string }).code, ERROR_CODES.internal);
+      equal((error as { details?: unknown }).details, null);
       return true;
     },
   );

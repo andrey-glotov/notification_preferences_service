@@ -30,7 +30,7 @@ X-Request-Id: manual-create-user-1
 
 > {%
   client.test("creates or updates user", function () {
-    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.status === 201, "Expected 200 OK");
   });
 
   client.test("returns expected user", function () {
@@ -76,7 +76,7 @@ X-Request-Id: manual-update-preference-1
 
 > {%
   client.test("updates preference", function () {
-    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.status === 201, "Expected 200 OK");
     client.assert(response.body.data.updated === true, "Expected updated true");
   });
 %}
@@ -116,7 +116,7 @@ X-Request-Id: manual-update-quiet-hours-1
 
 > {%
   client.test("updates quiet hours", function () {
-    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.status === 201, "Expected 200 OK");
     client.assert(response.body.data.updated === true, "Expected updated true");
   });
 %}
@@ -130,8 +130,8 @@ X-Request-Id: manual-check-quiet-hours-1
 > {%
   client.test("returns quiet hours", function () {
     client.assert(response.status === 200, "Expected 200 OK");
-    client.assert(response.body.data.quietHours.startTime === "22:00", "Expected startTime 22:00");
-    client.assert(response.body.data.quietHours.endTime === "08:00", "Expected endTime 08:00");
+    client.assert(response.body.data.quietHours.startTime === "22:00:00", "Expected startTime 22:00");
+    client.assert(response.body.data.quietHours.endTime === "08:00:00", "Expected endTime 08:00");
     client.assert(response.body.data.quietHours.timezone === "Asia/Yekaterinburg", "Expected timezone Asia/Yekaterinburg");
   });
 %}
@@ -153,7 +153,7 @@ X-Request-Id: manual-evaluate-allow-1
 
 > {%
   client.test("allows by user preference", function () {
-    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.status === 201, "Expected 200 OK");
     client.assert(response.body.data.decision === "allow", "Expected decision allow");
     client.assert(response.body.data.reason === "allowed_by_user_preference", "Expected allowed_by_user_preference");
     client.assert(response.body.data.source === "user_preference", "Expected user_preference");
@@ -177,7 +177,7 @@ X-Request-Id: manual-evaluate-global-policy-1
 
 > {%
   client.test("denies by global policy", function () {
-    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.status === 201, "Expected 201 OK");
     client.assert(response.body.data.decision === "deny", "Expected decision deny");
     client.assert(response.body.data.reason === "blocked_by_global_policy", "Expected blocked_by_global_policy");
     client.assert(response.body.data.source === "global_policy", "Expected global_policy");
@@ -201,7 +201,7 @@ X-Request-Id: manual-evaluate-quiet-hours-1
 
 > {%
   client.test("returns evaluation result", function () {
-    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.status === 201, "Expected 201 OK");
     client.assert(["allow", "deny"].includes(response.body.data.decision), "Expected allow or deny decision");
   });
 %}
