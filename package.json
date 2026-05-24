@@ -37,11 +37,11 @@
     "@nestjs/schematics": "11.1.0",
     "@nestjs/testing": "11.1.23",
     "@types/express": "^5.0.6",
-    "@types/node": "25.9.1",
+    "@types/node": "24.10.0",
     "@types/pg": "8.20.0",
     "dotenv": "17.4.2",
     "drizzle-kit": "0.31.10",
     "ts-node": "10.9.2",
-    "typescript": "6.0.3"
+    "typescript": "5.9.3"
   }
 }

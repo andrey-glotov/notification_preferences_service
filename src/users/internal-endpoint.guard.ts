@@ -19,7 +19,11 @@ export class InternalEndpointGuard implements CanActivate {
       return true;
     }
 
-    if (this.configService.get<boolean>('app.enableInternalEndpoints') === true) {
+    const internalEndpointsEnabled =
+      this.configService.get<boolean>('app.enableInternalEndpoints') === true ||
+      this.configService.get<string>('ENABLE_INTERNAL_ENDPOINTS') === 'true';
+
+    if (internalEndpointsEnabled) {
       return true;
     }
 

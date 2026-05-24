@@ -1,5 +1,5 @@
 import { Provider } from '@nestjs/common';
-import { ConfigService, ConfigType } from '@nestjs/config';
+import { ConfigType } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { databaseConfig } from '../config/database.config';
@@ -8,11 +8,8 @@ import { DATABASE } from './database.constants';
 
 export const databaseProvider: Provider = {
   provide: DATABASE,
-  inject: [ConfigService],
-  useFactory: (configService: ConfigService) => {
-    const config = configService.getOrThrow<ConfigType<typeof databaseConfig>>(
-      databaseConfig.KEY,
-    );
+  inject: [databaseConfig.KEY],
+  useFactory: (config: ConfigType<typeof databaseConfig>) => {
     const pool = new Pool({
       connectionString: config.url,
     });

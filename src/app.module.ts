@@ -19,6 +19,7 @@ import { UsersModule } from './users/users.module';
       envFilePath: '.env',
       load: [appConfig, databaseConfig],
     }),
+    ConfigModule.forFeature(appConfig),
     ObservabilityModule,
     ErrorsModule,
     DatabaseModule,

@@ -1,0 +1,236 @@
+@baseUrl = http://localhost:3000
+@basicAuth = Basic bG9jYWw6bG9jYWw=
+
+### 1. Auth check: запрос без Authorization должен вернуть 401
+GET {{baseUrl}}/api/vk/users/user-1/preferences
+Accept: application/json
+X-Request-Id: manual-auth-check-1
+
+> {%
+  client.test("returns 401 without Authorization", function () {
+    client.assert(response.status === 401, "Expected 401 Unauthorized");
+  });
+
+  client.test("returns unauthorized error code", function () {
+    client.assert(response.body.error.code === "unauthorized", "Expected unauthorized error code");
+  });
+%}
+
+### 2. Создать или обновить локальную проекцию пользователя
+POST {{baseUrl}}/internal/vk/users
+Authorization: {{basicAuth}}
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: manual-create-user-1
+
+{
+  "userId": "user-1",
+  "region": "EU"
+}
+
+> {%
+  client.test("creates or updates user", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+  });
+
+  client.test("returns expected user", function () {
+    client.assert(response.body.data.ecosystemCode === "vk", "Expected ecosystemCode vk");
+    client.assert(response.body.data.userId === "user-1", "Expected userId user-1");
+    client.assert(response.body.data.region === "EU", "Expected region EU");
+  });
+%}
+
+### 3. Получить effective preferences пользователя
+GET {{baseUrl}}/api/vk/users/user-1/preferences
+Authorization: {{basicAuth}}
+Accept: application/json
+X-Request-Id: manual-get-preferences-1
+
+> {%
+  client.test("returns preferences", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+  });
+
+  client.test("returns expected user identity", function () {
+    client.assert(response.body.data.ecosystemCode === "vk", "Expected ecosystemCode vk");
+    client.assert(response.body.data.userId === "user-1", "Expected userId user-1");
+  });
+%}
+
+### 4. Обновить пользовательскую preference: marketing/email = allowed true
+POST {{baseUrl}}/api/vk/users/user-1/preferences
+Authorization: {{basicAuth}}
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: manual-update-preference-1
+
+{
+  "preferences": [
+    {
+      "notificationType": "marketing",
+      "channel": "email",
+      "allowed": true
+    }
+  ]
+}
+
+> {%
+  client.test("updates preference", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.data.updated === true, "Expected updated true");
+  });
+%}
+
+### 5. Проверить, что preference стала effective user_preference
+GET {{baseUrl}}/api/vk/users/user-1/preferences
+Authorization: {{basicAuth}}
+Accept: application/json
+X-Request-Id: manual-check-user-preference-1
+
+> {%
+  client.test("marketing/email is user_preference and allowed true", function () {
+    const item = response.body.data.preferences.find(function (preference) {
+      return preference.notificationType === "marketing" && preference.channel === "email";
+    });
+
+    client.assert(Boolean(item), "Expected marketing/email preference");
+    client.assert(item.allowed === true, "Expected allowed true");
+    client.assert(item.source === "user_preference", "Expected source user_preference");
+  });
+%}
+
+### 6. Обновить quiet hours
+POST {{baseUrl}}/api/vk/users/user-1/preferences
+Authorization: {{basicAuth}}
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: manual-update-quiet-hours-1
+
+{
+  "quietHours": {
+    "startTime": "22:00",
+    "endTime": "08:00",
+    "timezone": "Asia/Yekaterinburg"
+  }
+}
+
+> {%
+  client.test("updates quiet hours", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.data.updated === true, "Expected updated true");
+  });
+%}
+
+### 7. Проверить, что quiet hours сохранились
+GET {{baseUrl}}/api/vk/users/user-1/preferences
+Authorization: {{basicAuth}}
+Accept: application/json
+X-Request-Id: manual-check-quiet-hours-1
+
+> {%
+  client.test("returns quiet hours", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.data.quietHours.startTime === "22:00", "Expected startTime 22:00");
+    client.assert(response.body.data.quietHours.endTime === "08:00", "Expected endTime 08:00");
+    client.assert(response.body.data.quietHours.timezone === "Asia/Yekaterinburg", "Expected timezone Asia/Yekaterinburg");
+  });
+%}
+
+### 8. Evaluation: allow по пользовательской preference
+POST {{baseUrl}}/api/vk/evaluate
+Authorization: {{basicAuth}}
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: manual-evaluate-allow-1
+
+{
+  "userId": "user-1",
+  "notificationType": "marketing",
+  "channel": "email",
+  "region": "EU",
+  "datetime": "2027-05-21T12:00:00Z"
+}
+
+> {%
+  client.test("allows by user preference", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.data.decision === "allow", "Expected decision allow");
+    client.assert(response.body.data.reason === "allowed_by_user_preference", "Expected allowed_by_user_preference");
+    client.assert(response.body.data.source === "user_preference", "Expected user_preference");
+  });
+%}
+
+### 9. Evaluation: deny по global policy из test seed
+POST {{baseUrl}}/api/vk/evaluate
+Authorization: {{basicAuth}}
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: manual-evaluate-global-policy-1
+
+{
+  "userId": "user-1",
+  "notificationType": "marketing",
+  "channel": "sms",
+  "region": "EU",
+  "datetime": "2027-05-21T12:00:00Z"
+}
+
+> {%
+  client.test("denies by global policy", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(response.body.data.decision === "deny", "Expected decision deny");
+    client.assert(response.body.data.reason === "blocked_by_global_policy", "Expected blocked_by_global_policy");
+    client.assert(response.body.data.source === "global_policy", "Expected global_policy");
+  });
+%}
+
+### 10. Evaluation: deny по quiet hours
+POST {{baseUrl}}/api/vk/evaluate
+Authorization: {{basicAuth}}
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: manual-evaluate-quiet-hours-1
+
+{
+  "userId": "user-1",
+  "notificationType": "marketing",
+  "channel": "email",
+  "region": "EU",
+  "datetime": "2027-05-21T17:30:00Z"
+}
+
+> {%
+  client.test("returns evaluation result", function () {
+    client.assert(response.status === 200, "Expected 200 OK");
+    client.assert(["allow", "deny"].includes(response.body.data.decision), "Expected allow or deny decision");
+  });
+%}
+
+### 11. Validation error: пустой body для update preferences
+POST {{baseUrl}}/api/vk/users/user-1/preferences
+Authorization: {{basicAuth}}
+Content-Type: application/json
+Accept: application/json
+X-Request-Id: manual-validation-error-1
+
+{}
+
+> {%
+  client.test("returns validation error", function () {
+    client.assert(response.status === 400, "Expected 400 Bad Request");
+    client.assert(response.body.error.code === "validation_error", "Expected validation_error");
+  });
+%}
+
+### 12. Not found: неизвестный пользователь
+GET {{baseUrl}}/api/vk/users/unknown-user/preferences
+Authorization: {{basicAuth}}
+Accept: application/json
+X-Request-Id: manual-user-not-found-1
+
+> {%
+  client.test("returns not found", function () {
+    client.assert(response.status === 404, "Expected 404 Not Found");
+    client.assert(response.body.error.code === "not_found", "Expected not_found");
+  });
+%}

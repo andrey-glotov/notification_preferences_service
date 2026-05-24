@@ -159,7 +159,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (process.argv[1]?.endsWith('base.seed.ts')) {
+if (process.argv[1]?.endsWith('base.seed.ts') || process.argv[1]?.endsWith('base.seed.js')) {
   main().catch((error) => {
     console.error(error);
     process.exit(1);

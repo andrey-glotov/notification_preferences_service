@@ -21,6 +21,9 @@ export class BasicAuthGuard implements CanActivate {
     const startedAt = process.hrtime.bigint();
     const response = context.switchToHttp().getResponse<Response>();
     const request = context.switchToHttp().getRequest<Request>();
+    if (request.method === 'OPTIONS') {
+      return true;
+    }
 
     if (!this.basicAuthService.isConfigured()) {
       void this.observabilityContextService.getContext();
@@ -34,9 +37,7 @@ export class BasicAuthGuard implements CanActivate {
         severity: 'critical',
       });
     }
-
     const credentials = this.basicAuthService.parseAuthorizationHeader(request.headers.authorization);
-
     if (credentials === null || !this.basicAuthService.verifyCredentials(credentials)) {
       response.setHeader('WWW-Authenticate', WWW_AUTHENTICATE_VALUE);
       void this.observabilityContextService.getContext();
