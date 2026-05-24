@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ErrorService } from '../errors/error.service';
+import { ObservabilityService } from '../observability/observability.service';
 import { PreferencesRepository } from './preferences.repository';
 import {
   DefaultPreferenceWithUserOverride,
@@ -18,6 +19,7 @@ export class PreferencesService {
   constructor(
     private readonly preferencesRepository: PreferencesRepository,
     private readonly errorService: ErrorService,
+    @Optional() private readonly observabilityService?: ObservabilityService,
   ) {}
 
   async getUserPreferences(identity: UserIdentity): Promise<UserPreferences> {
@@ -36,6 +38,7 @@ export class PreferencesService {
   }
 
   async updateUserPreferences(input: UpdateUserPreferencesInput): Promise<UserIdentity> {
+    const startedAt = process.hrtime.bigint();
     const user = await this.findUserOrThrow(input, 'update_user_preferences');
     const preferences = input.preferences
       ? await this.resolvePreferenceUpdates(input.preferences, input)
@@ -58,6 +61,8 @@ export class PreferencesService {
         cause: error,
       });
     }
+
+    this.recordSuccessfulUpdate(input, startedAt);
 
     return {
       ecosystemCode: input.ecosystemCode,
@@ -141,5 +146,38 @@ export class PreferencesService {
     }
 
     return resolved;
+  }
+
+  private recordSuccessfulUpdate(input: UpdateUserPreferencesInput, startedAt: bigint): void {
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+
+    for (const preference of input.preferences ?? []) {
+      this.observabilityService?.recordPreferenceChanged({
+        ecosystemCode: input.ecosystemCode,
+        userId: input.userId,
+        notificationType: preference.notificationType,
+        channel: preference.channel,
+        allowed: preference.allowed,
+        source: 'user_preference',
+      });
+    }
+
+    if (input.quietHours !== undefined) {
+      this.observabilityService?.recordQuietHoursChanged({
+        ecosystemCode: input.ecosystemCode,
+        userId: input.userId,
+        startTime: input.quietHours.startTime,
+        endTime: input.quietHours.endTime,
+        timezone: input.quietHours.timezone,
+      });
+    }
+
+    this.observabilityService?.recordDuration({
+      metricName: 'preferences_update_duration_ms',
+      durationMs,
+      component: 'preferences',
+      operation: 'update_user_preferences',
+      labels: { operation: 'update_user_preferences' },
+    });
   }
 }

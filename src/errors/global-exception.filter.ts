@@ -1,6 +1,7 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Optional } from '@nestjs/common';
 import type { Response } from 'express';
 import { ObservabilityContextService } from '../observability/observability-context.service';
+import { ObservabilityService } from '../observability/observability.service';
 import { ApplicationError } from './application-error';
 import { ERROR_CODES } from './error-codes';
 import { sanitizeErrorDetails } from './error-details-sanitizer';
@@ -12,6 +13,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   constructor(
     private readonly errorService: ErrorService,
     private readonly observabilityContextService: ObservabilityContextService,
+    @Optional() private readonly observabilityService?: ObservabilityService,
   ) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -84,17 +86,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   private recordErrorEvent(error: ApplicationError): void {
     try {
-      void {
-        requestId: this.observabilityContextService.getRequestId(),
-        serviceId: this.observabilityContextService.getServiceId(),
-        correlationId: this.observabilityContextService.getCorrelationId(),
+      this.observabilityService?.recordServiceError({
         errorCode: error.code,
-        component: error.component,
-        operation: error.operation,
-        severity: error.severity,
-        retryable: error.retryable,
-        details: sanitizeErrorDetails(error.details),
-      };
+        errorMessage: error.message,
+        component: error.component ?? 'api',
+        operation: error.operation ?? 'handle_request',
+        severity: error.severity ?? 'error',
+        retryable: error.retryable ?? false,
+        metadata: sanitizeErrorDetails(error.details),
+      });
     } catch {
       // Future observability sinks must never affect HTTP responses.
     }

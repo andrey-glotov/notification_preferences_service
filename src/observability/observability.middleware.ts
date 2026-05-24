@@ -1,11 +1,15 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware, Optional } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { ObservabilityContextService } from './observability-context.service';
+import { ObservabilityService } from './observability.service';
 import { generateRequestId, isValidRequestId } from './request-id';
 
 @Injectable()
 export class ObservabilityMiddleware implements NestMiddleware {
-  constructor(private readonly contextService: ObservabilityContextService) {}
+  constructor(
+    private readonly contextService: ObservabilityContextService,
+    @Optional() private readonly observabilityService?: ObservabilityService,
+  ) {}
 
   use(req: Request, res: Response, next: NextFunction): void {
     const requestId = this.resolveRequestId(req.headers['x-request-id']);
@@ -14,7 +18,7 @@ export class ObservabilityMiddleware implements NestMiddleware {
 
     res.setHeader('X-Request-Id', requestId);
     res.once('finish', () => {
-      this.measureDuration(startedAt);
+      this.recordHttpTelemetry(req, res, startedAt);
     });
 
     this.contextService.runWithContext(
@@ -35,11 +39,55 @@ export class ObservabilityMiddleware implements NestMiddleware {
     return isValidRequestId(headerValue) ? headerValue : null;
   }
 
-  private measureDuration(startedAt: bigint): void {
+  private recordHttpTelemetry(req: Request, res: Response, startedAt: bigint): void {
     try {
-      Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      const statusCode = res.statusCode;
+      const operation = 'handle_http_request';
+      const payload = {
+        method: req.method,
+        route: this.normalizeRoute(req),
+        statusCode,
+        durationMs,
+      };
+
+      this.observabilityService?.recordEvent({
+        eventType: statusCode >= 500 ? 'http_request_failed' : 'http_request_completed',
+        component: 'http',
+        operation,
+        severity: statusCode >= 500 ? 'error' : 'info',
+        payload,
+      });
+      this.observabilityService?.incrementCounter({
+        metricName: 'http_requests_total',
+        component: 'http',
+        operation,
+        labels: {
+          operation,
+          statusCode,
+        },
+      });
+      if (statusCode >= 500) {
+        this.observabilityService?.incrementCounter({
+          metricName: 'http_requests_failed_total',
+          component: 'http',
+          operation,
+          labels: { statusCode },
+        });
+      }
+      this.observabilityService?.recordDuration({
+        metricName: 'http_request_duration_ms',
+        durationMs,
+        component: 'http',
+        operation,
+        labels: { operation },
+      });
     } catch {
       // HTTP telemetry must never affect request handling.
     }
+  }
+
+  private normalizeRoute(req: Request): string {
+    return req.route?.path ? `${req.baseUrl}${String(req.route.path)}` : 'unknown';
   }
 }

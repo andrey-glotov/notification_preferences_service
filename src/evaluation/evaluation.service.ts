@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ErrorService } from '../errors/error.service';
+import { ObservabilityService } from '../observability/observability.service';
 import { EvaluationRepository } from './evaluation.repository';
 import {
   EvaluationChannel,
@@ -15,9 +16,31 @@ export class EvaluationService {
   constructor(
     private readonly evaluationRepository: EvaluationRepository,
     private readonly errorService: ErrorService,
+    @Optional() private readonly observabilityService?: ObservabilityService,
   ) {}
 
   async evaluate(input: EvaluationInput): Promise<EvaluationResult> {
+    const startedAt = process.hrtime.bigint();
+    const result = await this.evaluateDecision(input);
+    const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+
+    this.observabilityService?.recordNotificationDecision({
+      ecosystemCode: input.ecosystemCode,
+      userId: input.userId,
+      notificationType: input.notificationType,
+      channel: input.channel,
+      region: input.region,
+      datetime: input.datetime,
+      decision: result.decision,
+      reason: result.reason,
+      source: result.source,
+      durationMs,
+    });
+
+    return result;
+  }
+
+  private async evaluateDecision(input: EvaluationInput): Promise<EvaluationResult> {
     const [user, notificationType, channel] = await Promise.all([
       this.findUserOrThrow(input),
       this.findNotificationTypeOrThrow(input.notificationType),
