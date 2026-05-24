@@ -7,6 +7,7 @@ import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
 import { DatabaseModule } from './database/database.module';
 import { ErrorsModule } from './errors/errors.module';
+import { EvaluationModule } from './evaluation/evaluation.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { UsersModule } from './users/users.module';
@@ -23,6 +24,7 @@ import { UsersModule } from './users/users.module';
     DatabaseModule,
     UsersModule,
     PreferencesModule,
+    EvaluationModule,
     AuthModule,
   ],
   controllers: [AppController],
