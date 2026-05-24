@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
 import { DatabaseModule } from './database/database.module';
+import { ErrorsModule } from './errors/errors.module';
 import { ObservabilityModule } from './observability/observability.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { ObservabilityModule } from './observability/observability.module';
       load: [appConfig, databaseConfig],
     }),
     ObservabilityModule,
+    ErrorsModule,
     DatabaseModule,
   ],
   controllers: [AppController],
